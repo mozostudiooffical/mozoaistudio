@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mozo Mini</title>
+    <style>
+        /* General Setup */
+        html, body {
+            height: 100%;
+            width: 100%;
+            margin: 0;
+            font-family: sans-serif;
+            background-color: #f4f4f4;
+            overflow: hidden; /* Hide scrollbars during animation */
+        }
+
+        /* --- Startup Animation Styles --- */
+        #startup-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: linear-gradient(135deg, #2C3E50, #000000);
+            background-size: 400% 400%;
+            z-index: 100;
+            opacity: 1;
+            transition: opacity 1s ease-out;
+            animation: gradientBG 8s ease infinite;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        #startup-text {
+            color: white;
+            font-size: 3rem;
+            font-weight: bold;
+            opacity: 0;
+            transform: scale(0.8);
+            animation: fadeInScale 2.5s forwards cubic-bezier(0.25, 0.1, 0.25, 1);
+        }
+
+        @keyframes fadeInScale {
+            0% {
+                opacity: 0;
+                transform: scale(0.8);
+            }
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+        
+        /* Class to hide elements */
+        .hidden {
+            display: none !important;
+        }
+
+        /* --- Main Layout for Chat --- */
+        .main-layout {
+            display: flex;
+            width: 100%;
+            height: 100%;
+            opacity: 0; /* Initially hidden, fades in after animation */
+            transition: opacity 0.5s ease-in;
+            background-color: white; /* Fallback for main-layout */
+        }
+
+        @media (min-width: 550px) {
+            body {
+                display: flex;
+                justify-content: center;
+                align-items: center;
+            }
+            .main-layout {
+                width: 750px; /* Increased width to accommodate sidebar */
+                max-width: 100%;
+                height: 85vh;
+                max-height: 750px;
+                border-radius: 12px;
+                box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+                border: 1px solid #ddd;
+                overflow: hidden; /* Important to keep rounded corners */
+            }
+        }
+
+        /* --- Chat List Sidebar Styles --- */
+        .chat-list-sidebar {
+            width: 250px;
+            background-color: #333;
+            color: white;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #444;
+            flex-shrink: 0;
+            padding: 15px;
+            overflow-y: auto;
+            transform: translateX(0); /* Default position for desktop */
+            transition: transform 0.3s ease-in-out;
+            z-index: 20; /* Ensure sidebar is above main chat for mobile overlay */
+        }
+
+        .chat-list-sidebar.hidden-sidebar {
+            transform: translateX(-100%); /* Hide sidebar off-screen */
+            position: absolute; /* Take out of flow to hide completely */
+            height: 100%;
+        }
+
+        .new-chat-button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            font-weight: bold;
+            text-align: center;
+            font-size: 1rem;
+            transition: background-color 0.2s ease;
+        }
+
+        .new-chat-button:hover {
+            background-color: #0056b3;
+        }
+
+        .chat-list-sidebar h3 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: #eee;
+            font-size: 1.2rem;
+        }
+
+        #chatList ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            flex-grow: 1; /* Allows list to take available space */
+        }
+
+        #chatList li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background-color: #4a4a4a;
+            color: white;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+            font-size: 0.95rem;
+            word-break: break-word; /* Ensure long titles wrap */
+        }
+
+        #chatList li:hover {
+            background-color: #555;
+        }
+
+        #chatList li.active {
+            background-color: #007bff; /* Highlight active chat */
+            font-weight: bold;
+        }
+
+        .chat-title-preview {
+            flex-grow: 1;
+            white-space: nowrap; /* Prevent text wrapping */
+            overflow: hidden;    /* Hide overflowed text */
+            text-overflow: ellipsis; /* Add ellipsis for overflowed text */
+            margin-right: 10px; /* Space between text and delete button */
+        }
+
+        .delete-chat-button {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 5px;
+            line-height: 1; /* Align 'x' properly */
+            transition: color 0.2s ease;
+        }
+
+        .delete-chat-button:hover {
+            color: #ff4d4d;
+        }
+
+        /* --- Chatbot Styles (Main Chat Area) --- */
+        .chat-container {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            position: relative; /* For the toggle button positioning */
+        }
+
+        .chat-header {
+            background-color: #4a4a4a;
+            color: white;
+            padding: 15px;
+            text-align: center;
+            flex-shrink: 0;
+            display: flex; /* For toggle button */
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .chat-header h2 {
+            margin: 0;
+            flex-grow: 1; /* Center title */
+        }
+
+        .chat-box {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .message {
+            max-width: 80%;
+            padding: 10px 15px;
+            border-radius: 12px;
+            margin-bottom: 10px;
+            line-height: 1.4;
+            word-wrap: break-word;
+            display: flex; /* To align button */
+            align-items: flex-end; /* Align button at the bottom of the message bubble */
+        }
+        
+        .message p {
+            margin: 0;
+            flex-grow: 1; /* Allow text to take most space */
+        }
+
+        .user-message {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+            justify-content: flex-end; /* Align content editable p to right */
+        }
+        .user-message p:focus {
+            outline: 1px dashed rgba(255,255,255,0.7); /* Highlight editable area */
+        }
+
+
+        .bot-message {
+            background-color: #e9e9eb;
+            color: black;
+            align-self: flex-start;
+            justify-content: flex-start; /* Align content to left */
+        }
+
+        /* Message action buttons */
+        .message-actions {
+            display: flex;
+            gap: 5px;
+            margin-left: 10px; /* Space from message text */
+            flex-shrink: 0; /* Prevent buttons from shrinking */
+        }
+
+        .message-actions button {
+            background: none;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            padding: 2px 5px;
+            border-radius: 5px;
+            transition: background-color 0.2s ease;
+            color: inherit; /* Inherit color from message bubble */
+        }
+
+        .user-message .message-actions button {
+             color: white;
+        }
+
+        .bot-message .message-actions button {
+            color: #333;
+        }
+
+        .message-actions button:hover {
+            background-color: rgba(0,0,0,0.1);
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 15px;
+            border-top: 1px solid #ddd;
+            background-color: #fff;
+            flex-shrink: 0;
+        }
+
+        #userInput {
+            flex-grow: 1;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            padding: 10px 15px;
+            font-size: 16px;
+        }
+
+        #sendButton {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            margin-left: 10px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        #sendButton:hover {
+            background-color: #0056b3;
+        }
+
+        /* Mobile specific styles */
+        @media (max-width: 549px) {
+            .main-layout {
+                flex-direction: column; /* Stack sidebar and chat on mobile */
+            }
+
+            .chat-list-sidebar {
+                position: fixed; /* Overlay on mobile */
+                width: 80%; /* Takes up most of the screen */
+                height: 100%;
+                top: 0;
+                left: 0;
+                transform: translateX(-100%); /* Hidden by default */
+                box-shadow: 2px 0 5px rgba(0,0,0,0.5);
+                transition: transform 0.3s ease-in-out;
+            }
+
+            .chat-list-sidebar.active {
+                transform: translateX(0%); /* Show sidebar */
+            }
+
+            .chat-container {
+                width: 100%;
+                height: 100%;
+            }
+
+            .toggle-sidebar-button {
+                display: block; /* Show on mobile */
+                background: none;
+                border: none;
+                color: white;
+                font-size: 1.5rem;
+                cursor: pointer;
+                position: absolute;
+                left: 15px;
+                top: 50%;
+                transform: translateY(-50%);
+                padding: 0;
+            }
+        }
+
+        @media (min-width: 550px) {
+            .toggle-sidebar-button {
+                display: none; /* Hide on desktop */
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Startup Animation Screen -->
+    <div id="startup-animation">
+        <h1 id="startup-text">Mozo AI</h1>
+    </div>
+
+    <!-- Main Layout for Chat Interface -->
+    <div class="main-layout" id="mainLayout">
+        <!-- Chat List Sidebar -->
+        <div class="chat-list-sidebar" id="chatListSidebar">
+            <h3>Chats</h3>
+            <button class="new-chat-button" id="newChatButton">New Chat</button>
+            <div id="chatList">
+                <ul>
+                    <!-- Chat session items will be rendered here -->
+                </ul>
+            </div>
+        </div>
+
+        <!-- Chatbot Interface (Main Chat Area) -->
+        <div class="chat-container" id="chatContainer">
+            <div class="chat-header">
+                <button class="toggle-sidebar-button" id="toggleSidebarButton">☰</button>
+                <h2>Mozo Mini</h2>
+            </div>
+            <div class="chat-box" id="chatBox">
+                <!-- Messages will go here -->
+            </div>
+            <div class="chat-input">
+                <input type="text" id="userInput" placeholder="Type a message..." autocomplete="off">
+                <button id="sendButton">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- Disable Inspect Element / View Source ---
+        document.addEventListener('contextmenu', event => event.preventDefault()); // Disable right-click
+        document.addEventListener('keydown', event => {
+            // Disable F12
+            if (event.keyCode === 123) {
+                event.preventDefault();
+            }
+            // Disable Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+Shift+C (Developer Tools)
+            if (event.ctrlKey && event.shiftKey && (event.keyCode === 73 || event.keyCode === 74 || event.keyCode === 67)) {
+                event.preventDefault();
+            }
+            // Disable Ctrl+U (View Page Source)
+            if (event.ctrlKey && event.keyCode === 85) {
+                event.preventDefault();
+            }
+        });
+
+        // --- Animation Control ---
+        window.addEventListener('load', () => {
+            const animationScreen = document.getElementById('startup-animation');
+            const mainLayout = document.getElementById('mainLayout');
+
+            setTimeout(() => {
+                animationScreen.style.opacity = '0';
+                
+                setTimeout(() => {
+                    animationScreen.classList.add('hidden');
+                    document.body.style.overflow = 'auto';
+                    mainLayout.style.opacity = '1';
+                }, 1000);
+
+            }, 3000);
+
+            // Load chat history after animation
+            loadAllChats();
+        });
+
+
+        // --- Chatbot Logic ---
+        const chatBox = document.getElementById('chatBox');
+        const userInput = document.getElementById('userInput');
+        const sendButton = document.getElementById('sendButton');
+        const chatListUl = document.querySelector('#chatList ul');
+        const newChatButton = document.getElementById('newChatButton');
+        const chatListSidebar = document.getElementById('chatListSidebar');
+        const toggleSidebarButton = document.getElementById('toggleSidebarButton');
+
+
+        // Global variables for managing multiple chats
+        let allChats = {}; // Stores all chat sessions: {[chatId]: { name: "Chat X", history: [{role, content}, ...]}}
+        let currentChatId = null;
+        const CHATS_STORAGE_KEY = 'mozoAllChats';
+
+        // Keys for your APIs
+        const llamaApiKey = "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";
+        const openRouterApiUrl = "https://openrouter.ai/api/v1/chat/completions";
+
+        const DISLIKE_REDIRECT_URL = "https://mozoaistudio.is-great.org";
+
+        // Helper to generate a unique ID (using Web Crypto API for better uniqueness)
+        function generateUniqueId() {
+            return crypto.randomUUID();
+        }
+
+        // Function to save all chats to localStorage
+        function saveAllChats() {
+            localStorage.setItem(CHATS_STORAGE_KEY, JSON.stringify(allChats));
+            // Also save the currentChatId to persist active chat across sessions
+            localStorage.setItem('mozoCurrentChatId', currentChatId);
+        }
+
+        // Function to load all chats from localStorage
+        function loadAllChats() {
+            const savedChats = localStorage.getItem(CHATS_STORAGE_KEY);
+            const savedCurrentChatId = localStorage.getItem('mozoCurrentChatId');
+
+            if (savedChats) {
+                allChats = JSON.parse(savedChats);
+            } else {
+                allChats = {};
+            }
+
+            if (Object.keys(allChats).length === 0) {
+                createNewChat("Hi there! How can I help you today?", false); // Create a default chat if none exist
+            } else {
+                currentChatId = savedCurrentChatId && allChats[savedCurrentChatId] ? savedCurrentChatId : Object.keys(allChats)[0];
+                displayCurrentChatMessages();
+                renderChatList();
+            }
+        }
+
+        // Function to render chat sessions in the sidebar
+        function renderChatList() {
+            chatListUl.innerHTML = ''; // Clear existing list
+            for (const id in allChats) {
+                const chatSession = allChats[id];
+                const li = document.createElement('li');
+                li.dataset.chatId = id;
+                li.classList.toggle('active', id === currentChatId);
+
+                const titlePreview = document.createElement('span');
+                titlePreview.classList.add('chat-title-preview');
+                // Display the first user message or a generic "New Chat"
+                const firstUserMessage = chatSession.history.find(msg => msg.role === 'user');
+                titlePreview.textContent = firstUserMessage ? firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '') : chatSession.name || "New Chat";
+                li.appendChild(titlePreview);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.classList.add('delete-chat-button');
+                deleteButton.textContent = '×';
+                deleteButton.title = 'Delete Chat';
+                deleteButton.addEventListener('click', (e) => {
+                    e.stopPropagation(); // Prevent activating the chat when deleting
+                    deleteChat(id);
+                });
+                li.appendChild(deleteButton);
+
+                li.addEventListener('click', () => switchChat(id));
+                chatListUl.appendChild(li);
+            }
+        }
+
+        // Function to create a new chat session
+        function createNewChat(initialBotMessage = "Hello! What can I help you with?", selectNewChat = true) {
+            const newId = generateUniqueId();
+            allChats[newId] = {
+                name: "New Chat", // Initial name
+                history: []
+            };
+
+            // Add the initial bot message
+            allChats[newId].history.push({ role: "assistant", content: initialBotMessage });
+
+            if (selectNewChat) {
+                currentChatId = newId;
+            }
+            saveAllChats();
+            renderChatList();
+            displayCurrentChatMessages();
+            // If on mobile, hide sidebar after creating new chat
+            if (window.innerWidth < 550) {
+                chatListSidebar.classList.remove('active');
+            }
+        }
+
+        // Function to switch to a different chat session
+        function switchChat(chatId) {
+            if (currentChatId === chatId) return; // Already on this chat
+
+            currentChatId = chatId;
+            saveAllChats(); // Save currentChatId preference
+            displayCurrentChatMessages();
+            renderChatList(); // Update active highlight
+            // If on mobile, hide sidebar after selecting chat
+            if (window.innerWidth < 550) {
+                chatListSidebar.classList.remove('active');
+            }
+        }
+
+        // Function to delete a chat session
+        function deleteChat(chatIdToDelete) {
+            if (Object.keys(allChats).length === 1) {
+                // If it's the last chat, clear its history instead of deleting it
+                allChats[chatIdToDelete].history = [{ role: "assistant", content: "Chat cleared! How can I help you today?" }];
+                currentChatId = chatIdToDelete; // Keep it as the current chat
+                saveAllChats();
+                displayCurrentChatMessages();
+                renderChatList();
+                return;
+            }
+
+            if (confirm("Are you sure you want to delete this chat?")) {
+                delete allChats[chatIdToDelete];
+
+                if (chatIdToDelete === currentChatId) {
+                    // If the deleted chat was the current one, switch to another
+                    const remainingChatIds = Object.keys(allChats);
+                    if (remainingChatIds.length > 0) {
+                        currentChatId = remainingChatIds[0];
+                    } else {
+                        // If no chats left, create a new one
+                        createNewChat("Welcome to Mozo Mini! How can I assist you?", true);
+                        return; // createNewChat already calls saveAllChats, renderChatList, displayCurrentChatMessages
+                    }
+                }
+                saveAllChats();
+                renderChatList();
+                displayCurrentChatMessages();
+            }
+        }
+
+        // Function to display messages of the current chat
+        function displayCurrentChatMessages() {
+            chatBox.innerHTML = ''; // Clear existing messages
+            if (currentChatId && allChats[currentChatId]) {
+                allChats[currentChatId].history.forEach((msg, index) => {
+                    // Pass false for shouldAddToHistory as these messages are already in history
+                    // Pass the index for editing functionality
+                    appendMessage(msg.content, msg.role === 'user' ? 'user-message' : 'bot-message', false, index);
+                });
+            }
+        }
+
+        // Modified appendMessage to explicitly control if it adds to history and include index for editing
+        function appendMessage(text, className, shouldAddToHistory = false, index = -1) {
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message', className);
+            messageElement.dataset.index = index; // Store index for editing
+
+            const p = document.createElement('p');
+            p.textContent = text;
+            messageElement.appendChild(p);
+
+            // Add action buttons for user and bot messages
+            const actionsDiv = document.createElement('div');
+            actionsDiv.classList.add('message-actions');
+
+            if (className === 'user-message') {
+                p.contentEditable = true; // Make user messages editable
+
+                p.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault(); // Prevent new line in contenteditable
+                        p.blur(); // Trigger blur to save
+                    }
+                });
+
+                p.addEventListener('blur', function() {
+                    const newText = p.textContent.trim();
+                    if (newText === text) return; // No change
+
+                    editUserMessage(parseInt(messageElement.dataset.index), newText);
+                });
+
+            } else if (className === 'bot-message') {
+                const copyButton = document.createElement('button');
+                copyButton.textContent = '📋'; // Clipboard emoji
+                copyButton.title = 'Copy message';
+                copyButton.addEventListener('click', () => {
+                    navigator.clipboard.writeText(text).then(() => {
+                        // Optional: Provide feedback to the user
+                        console.log('Text copied to clipboard');
+                    }).catch(err => {
+                        console.error('Failed to copy text: ', err);
+                    });
+                });
+                actionsDiv.appendChild(copyButton);
+
+                const likeButton = document.createElement('button');
+                likeButton.textContent = '👍';
+                likeButton.title = 'Like message';
+                likeButton.addEventListener('click', () => {
+                    // Implement like functionality if needed
+                    console.log('Liked message:', text);
+                });
+                actionsDiv.appendChild(likeButton);
+
+                const dislikeButton = document.createElement('button');
+                dislikeButton.textContent = '👎';
+                dislikeButton.title = 'Dislike message';
+                dislikeButton.addEventListener('click', () => {
+                    console.log('Disliked message:', text);
+                    window.location.href = DISLIKE_REDIRECT_URL; // Redirect on dislike
+                });
+                actionsDiv.appendChild(dislikeButton);
+            }
+            
+            messageElement.appendChild(actionsDiv);
+            chatBox.appendChild(messageElement);
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            if (shouldAddToHistory && currentChatId && allChats[currentChatId]) {
+                allChats[currentChatId].history.push({ role: className === 'user-message' ? 'user' : 'assistant', content: text });
+                // Update chat name if it's the first user message
+                if (className === 'user-message' && allChats[currentChatId].history.filter(m => m.role === 'user').length === 1) {
+                    allChats[currentChatId].name = text.substring(0, 30) + (text.length > 30 ? '...' : '');
+                    renderChatList(); // Re-render to update the chat name in the sidebar
+                }
+                saveAllChats();
+            }
+        }
+
+        // Function to handle user message editing
+        function editUserMessage(messageIndex, newText) {
+            if (!currentChatId || !allChats[currentChatId]) return;
+
+            const history = allChats[currentChatId].history;
+
+            if (messageIndex >= 0 && messageIndex < history.length && history[messageIndex].role === 'user') {
+                history[messageIndex].content = newText; // Update the message content
+                
+                // Truncate history from this point onwards
+                allChats[currentChatId].history = history.slice(0, messageIndex + 1);
+
+                saveAllChats(); // Save the truncated history
+                displayCurrentChatMessages(); // Re-render chat box
+
+                // Make AI respond to the new message immediately
+                getLlamaResponse(allChats[currentChatId].history);
+            }
+        }
+
+        sendButton.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+        newChatButton.addEventListener('click', () => createNewChat());
+        toggleSidebarButton.addEventListener('click', () => {
+            chatListSidebar.classList.toggle('active');
+        });
+
+        function sendMessage() {
+            const userText = userInput.value.trim();
+            if (userText === "") return;
+
+            // When a new message is sent, ensure it's added at the end of the current history
+            // regardless of any previous edits that might have truncated it.
+            // appendMessage handles adding to history and saving.
+            appendMessage(userText, 'user-message', true, allChats[currentChatId].history.length); 
+            userInput.value = "";
+
+            // Get the current conversation history for the API call
+            const currentHistory = allChats[currentChatId].history;
+
+            const lowerCaseUserText = userText.toLowerCase();
+
+            // Handle hardcoded responses (now also added to current chat's history)
+            if (lowerCaseUserText === "who made you") {
+                const botResponse = "I Was Made By Mozo AI Team";
+                setTimeout(() => appendMessage(botResponse, 'bot-message', true, currentHistory.length), 500);
+            } else if (lowerCaseUserText.includes("owner")) {
+                const botResponse = "Dhruvil Prajapati";
+                setTimeout(() => appendMessage(botResponse, 'bot-message', true, currentHistory.length), 500);
+            } else if (lowerCaseUserText.includes("chatbot")) {
+                const botResponse = "I am Mozo Mini. The Mozo AI Team Made me.";
+                setTimeout(() => appendMessage(botResponse, 'bot-message', true, currentHistory.length), 500);
+            }
+            else {
+                getLlamaResponse(currentHistory); // Pass the current chat's history
+            }
+        }
+        
+        // This function now acts as the primary (and only) external API call
+        function getLlamaResponse(currentHistory) {
+             fetch(openRouterApiUrl, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${llamaApiKey}`,
+                    "HTTP-Referer": "<YOUR_SITE_URL>", // Optional. Replace with your actual site URL if deployed.
+                    "X-Title": "<YOUR_SITE_NAME>", // Optional. Replace with your actual site name.
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    "model": "meta-llama/llama-4-maverick:free",
+                    "messages": currentHistory // Send the full conversation history
+                })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                let botText = "Sorry, I couldn't get a response from the service.";
+                if (data.choices && data.choices.length > 0 && data.choices[0].message) {
+                    botText = data.choices[0].message.content;
+                }
+
+                // --- Word Replacement Logic ---
+                const wordsToReplace = ["Meta", "Facebook", "Instagram", "Whatsapp", "Thread"];
+                const replacement = "Mozo AI";
+
+                // Create a regex to match all words to replace, case-insensitive, globally
+                // The `\b` ensures whole words are matched (e.g., "thread" but not "threading")
+                const regex = new RegExp(`\\b(${wordsToReplace.join('|')})\\b`, 'gi');
+                botText = botText.replace(regex, replacement);
+                // --- End Word Replacement Logic ---
+
+                // When appending bot message, ensure its index is correct based on current history length
+                appendMessage(botText, 'bot-message', true, allChats[currentChatId].history.length);
+            })
+            .catch(error => {
+                console.error("Llama API Error:", error);
+                const errorMessage = "Sorry, the AI service is unavailable. Please try again later.";
+                // When appending error message, ensure its index is correct based on current history length
+                appendMessage(errorMessage, 'bot-message', true, allChats[currentChatId].history.length);
+            });
+        }
+    </script>
+
+</body>
+</html>
